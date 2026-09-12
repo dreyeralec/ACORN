@@ -7,7 +7,6 @@ load_dotenv()
 
 client = OpenAI()
 
-# going to have to provide instructions on how to populate structured output in context prompt
 
 class TradeAction(BaseModel):
     symbol: str
@@ -17,15 +16,16 @@ class TradeAction(BaseModel):
     limit_price: float | None = None
     reasoning: str
 
+
 class TradingDecision(BaseModel):
     actions: list[TradeAction]
     overall_reasoning: str
     confidence: Literal["low", "medium", "high"]
     halt_trading: bool
 
+
 class AIServiceError(Exception):
     """Raised when ACORN's AI service encounters an error"""
-    pass
 
 
 def call_trading_model(content: str) -> TradingDecision:
@@ -47,15 +47,11 @@ def call_trading_model(content: str) -> TradingDecision:
             input=content,
             text_format=TradingDecision
         )
-
         if response.output_parsed is None:
             raise AIServiceError("Model returned no parsabe output")
-
         return response.output_parsed
-
     except OpenAIError as e:
-        raise AIServiceError(f"ACORN's AI service encountered an error:\n{e}")
-
+        raise AIServiceError(f"AI service encountered an error:\n{e}")
     except IOError as e:
         raise AIServiceError(f"AI service couldn't read context prompt:\n{e}")
         
@@ -78,14 +74,10 @@ def call_analysis_model(content: str) -> str:
             instructions=sysPrompt,
             input=content,
         )
-
         if response.output_text is None:
             raise AIServiceError("Model returned no text")
-
         return response.output_text
-
     except OpenAIError as e:
-        raise AIServiceError(f"ACORN's AI service encountered an error:\n{e}")
-
+        raise AIServiceError(f"AI service encountered an error:\n{e}")
     except IOError as e:
         raise AIServiceError(f"AI service couldn't read context prompt:\n{e}")

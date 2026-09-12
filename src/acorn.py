@@ -6,13 +6,12 @@ from ibapi.order import Order
 
 from pandas import DataFrame
 
-from src.ai import call_trading_model, call_analysis_model
+from src.ai import call_trading_model, call_analysis_model, AIServiceError
 from src.util import is_valid_nyse_ticker
-from src.telegram import telegram_send, telegram_send_trade, get_updates
+from src.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
 from src.gateway import connect_ib_gateway
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ACORN")
+logger = logging.getLogger(__name__)
 
 
 def _get_portfolio_data() -> DataFrame:
@@ -35,7 +34,7 @@ def _get_portfolio_json() -> str:
     return _get_portfolio_data().to_json(orient="records")
 
 
-def wait_response(wait: int) -> str | None:
+def wait_res(wait: int) -> str | None:
     """Wait for response from telegram for specified amount of minutes.
 
         Args:
@@ -49,7 +48,7 @@ def wait_response(wait: int) -> str | None:
     while secs > 0:
         time.sleep(1)
         secs -= 1
-        data = get_updates(offset)
+        data = tel_get_updates(offset)
         for update in data["result"]:
             offset = update["update_id"] + 1
             message = update["message"]
@@ -60,7 +59,7 @@ def wait_response(wait: int) -> str | None:
     return None
 
 #probably could make this better but works for now
-def evaluate_user_response(res: str | None) -> bool:
+def eval_user_res(res: str | None) -> bool:
     """Process the user's telegram message in response to a trading recommendation.
     
         Args:
@@ -92,42 +91,48 @@ def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, 
         Returns:
             The user's decision on the trade recommendation.
     """
-    telegram_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
-    userResponse = wait_response(10)
-    return evaluate_user_response(userResponse)
+    try:
+        tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
+        userRes = wait_res(10)
+        return eval_user_res(userRes)
+    except TelegramServiceError as e:
+        logger.error(f"Couldn't reach Telegram, decision defaulting to NO")
+        return False
 
-
-def process_trading_decision(portfolio_data: str) -> None:
+            
+def trade_dec(portfolio_data: str) -> None:
     """Get a trading decision from the model and act on the recommendation.
     
         Args:
             portfolio_data: String of portfolio positions.
     """
-    tradingDecision = call_trading_model(portfolio_data)
-    if tradingDecision is None:
-        logger.warning("Trading model returned no decision")
+    try:
+        tradingDecision = call_trading_model(portfolio_data)
+    except AIServiceError as e:
+        logger.warning(f"Trading model returned no decision:\n{e}")
         return
     
     totalActs = len(tradingDecision.actions)
     for act, a in enumerate(tradingDecision.actions, start=1):
         if a.action == "HOLD":
             logger.info(f"Holding {a.symbol}")
-            telegram_send(f"ACORN chose to hold {a.symbol}\n\n{act} of {totalActs}")
+            tel_notify(f"ACORN chose to hold {a.symbol}\n\n{act} of {totalActs}")
         else:
             stage_action(a.symbol, a.action, a.quantity, a.order_type, a.limit_price, a.reasoning, act, totalActs)
 
 
-def process_eod_analysis(portfolio_data: str) -> None:
+def eod_analysis(portfolio_data: str) -> None:
     """Run end of day analysis report and send to telegram.
     
         Args:
             portfolio_data: String of portfolio positions.
     """
-    res = call_analysis_model(portfolio_data)
-    if res is None:
-        logger.warning("Analysis model returned no response")
+    try:
+        res = call_analysis_model(portfolio_data)
+    except AIServiceError as e:
+        logger.warning(f"Analysis model returned no response:\n{e}")
         return
-    telegram_send(res)
+    tel_notify(res)
 
 
 def make_contract(symbol: str, sec_type: str = "STK", exchange: str = "SMART", currency: str = "USD") -> Contract:
@@ -228,7 +233,7 @@ def stage_action(symbol: str, action: str, quantity: int, order_type: str, limit
         place_trade(symbol, action, quantity, order_type, limit_price)
     else:
         logger.info(f"Discarded {action} order on {symbol}")
-        telegram_send(f"Discarded {action} order on {symbol}")
+        tel_notify(f"Discarded {action} order on {symbol}")
 
 
 def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_price: float | None) -> None:
@@ -250,13 +255,13 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
         order = make_order(action, order_type, limit_price, quantity)
         submit_order(contract, order)
         logger.info(f"Performed {action} on {symbol}")
-        telegram_send(f"{action} {symbol} succeeded")
+        tel_notify(f"{action} {symbol} succeeded")
     except ValueError as e:
         logger.error(f"ACORN rejected an order:\n\n{e}")
-        telegram_send(f"ACORN rejected an order:\n\n{e}")
+        tel_notify(f"ACORN rejected an order:\n\n{e}")
     except RuntimeError as e:
         logger.error(f"ACORN hit a runtime error:\n\n{e}")
-        telegram_send(f"ACORN hit a runtime error:\n\n{e}")
+        tel_notify(f"ACORN hit a runtime error:\n\n{e}")
 
 
 def submit_order(contract: Contract, order: Order) -> None:
@@ -289,8 +294,8 @@ def dispatch_acorn(event: str) -> None:
     portfolio_data = _get_portfolio_json()
 
     if event in ("open", "noon"):
-        process_trading_decision(portfolio_data)
+        trade_dec(portfolio_data)
     elif event == "eod":
-        process_eod_analysis(portfolio_data)
+        eod_analysis(portfolio_data)
     else:
         logger.warning(f"Unrecognized event type {event}")

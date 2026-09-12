@@ -3,8 +3,7 @@ import threading
 
 from src.ib import IBApp
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ACORN")
+logger = logging.getLogger(__name__)
 
 _app: IBApp | None = None
 _lock = threading.Lock()

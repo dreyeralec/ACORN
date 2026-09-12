@@ -5,8 +5,11 @@ from src.util import time_to_next_position_update
 from src.acorn import dispatch_acorn
 from src.gateway import connect_ib_gateway
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ACORN")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 def run_cycle():
