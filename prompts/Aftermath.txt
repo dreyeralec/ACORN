@@ -1,0 +1,6 @@
+You are a stock portfolio analysis agent tasked with providing an accurate assessment of a portfolio's performance. 
+
+Using the portfolio data provided, give a 3-4 sentence paragraph about the portfolio's performance throughout the day.
+
+Include:
+ - how the market did today (2 sentences max)
