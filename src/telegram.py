@@ -2,18 +2,22 @@ import os
 import requests
 import logging
 
+from dotenv import load_dotenv
 from requests import RequestException
 
 logger = logging.getLogger(__name__)
 
-TOKEN = os.environ["TELEGRAM_BOT_KEY"]
+load_dotenv()
+
+TOKEN = os.getenv("TELEGRAM_BOT_KEY")
 
 
 class TelegramServiceError(Exception):
     """Raised if telegram service encounters an error"""
+    pass
 
 
-def _post(endpoint: str, payload: dict) -> dict:
+def _post(endpoint: str, payload: dict):
     """Helper for posting to the Telegram API"""
     try:
         res = requests.post(
@@ -22,7 +26,6 @@ def _post(endpoint: str, payload: dict) -> dict:
             timeout=10
         )
         res.raise_for_status()
-        return res.json()
     except RequestException as e:
         raise TelegramServiceError(f"Telegram API call to {endpoint} failed:\n{e}")
 

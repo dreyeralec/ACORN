@@ -37,7 +37,6 @@ def is_valid_ticker(symbol: str) -> bool:
 
 
 def time_to_next_position_update() -> tuple[float, str]:
-
     """Gets amount of time for ACORN to sleep until the next position update window
         currently using market open, noon, and eod.
 

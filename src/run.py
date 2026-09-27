@@ -31,7 +31,7 @@ def run_cycle():
     dispatch_acorn(event)
 
 
-def main() -> None:
+def main():
     while True:
         try:
             run_cycle()

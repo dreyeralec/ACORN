@@ -21,3 +21,7 @@ def test_call_analysis_model():
     res = call_analysis_model(port)
     assert res is not None
     assert len(res) > 0
+
+
+
+    # write tests for error messages
