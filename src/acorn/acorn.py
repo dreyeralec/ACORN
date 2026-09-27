@@ -7,10 +7,10 @@ from ibapi.order import Order
 
 from pandas import DataFrame
 
-from src.ai import call_trading_model, call_analysis_model, AIServiceError
-from src.util import is_valid_ticker
-from src.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
-from src.gateway import connect_ib_gateway
+from src.ai.ai import call_trading_model, call_analysis_model, AIServiceError
+from src.acorn.util import is_valid_ticker
+from src.telegram.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
+from src.ib.gateway import connect_ib_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ def wait_res(wait: int) -> str | None:
             return message["text"]
     return None
 
-#probably could make this better but works for now
+# todo: make this more flexible
 def eval_user_res(res: str | None) -> bool:
     """Process the user's telegram message in response to a trading recommendation.
     

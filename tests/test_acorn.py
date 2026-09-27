@@ -4,7 +4,7 @@ import sys
 
 from ibapi.contract import Contract
 from ibapi.order import Order
-from src.acorn import (
+from src.acorn.acorn import (
     make_contract,
     make_order,
     eval_user_res,
