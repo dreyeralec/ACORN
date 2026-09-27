@@ -1,5 +1,6 @@
 import logging
 import time
+import json
 
 from ibapi.contract import Contract
 from ibapi.order import Order
@@ -7,7 +8,7 @@ from ibapi.order import Order
 from pandas import DataFrame
 
 from src.ai import call_trading_model, call_analysis_model, AIServiceError
-from src.util import is_valid_nyse_ticker
+from src.util import is_valid_ticker
 from src.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
 from src.gateway import connect_ib_gateway
 
@@ -20,18 +21,58 @@ def _get_portfolio_data() -> DataFrame:
         Returns:
             Dataframe of portfolio positions.
     """
-    gate = connect_ib_gateway()
-    gate.reqPositions()
-    return gate.positions
+    gateway = connect_ib_gateway()
+    gateway.request_positions_event.clear()
+    gateway.reqPositions()
+    if not gateway.request_positions_event.wait(timeout=10):
+        raise TimeoutError("Timed out waiting for request positions")
+    gateway.cancelPositions()
+    return gateway.positions.copy()
 
 
-def _get_portfolio_json() -> str:
+def _get_portfolio_data_json() -> str:
     """Fetch current portfolio positions as a JSON string.
     
         Returns:
             String of portfolio positions.
     """
     return _get_portfolio_data().to_json(orient="records")
+
+
+def _get_account_data() -> dict:
+    """Fetch current account info as a dictionary.
+    
+        Returns:
+            Account data as a dictionary.
+    """
+    gateway = connect_ib_gateway()
+    tags = "NetLiquidation,TotalCashValue,BuyingPower,AvailableFunds,UnrealizedPnL,RealizedPnL"
+    gateway.account_summary_event.clear()
+    gateway.reqAccountSummary(9001, "All", tags)
+    if not gateway.account_summary_event.wait(timeout=10):
+        raise TimeoutError("Timed out waiting for account summary")
+    gateway.cancelAccountSummary(9001)
+    return gateway.account_values.copy()
+
+
+def _get_account_data_json() -> str:
+    """Fetch current account info as a JSON string.
+
+        Returns:
+            String of account data.
+    """
+    return json.dumps(_get_account_data())
+
+
+def _get_account_portfolio_json() -> str:
+    """Fetch account and portfolio information as JSON string.
+    
+        Returns:
+            Combined account and portfolio data as a string.
+    """
+    portf = _get_portfolio_data_json()
+    acc = _get_account_data_json()
+    return json.dumps(acc + portf)
 
 
 def wait_res(wait: int) -> str | None:
@@ -100,7 +141,7 @@ def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, 
         return False
 
             
-def trade_dec(portfolio_data: str) -> None:
+def get_trade_dec(portfolio_data: str) -> None:
     """Get a trading decision from the model and act on the recommendation.
     
         Args:
@@ -150,7 +191,7 @@ def make_contract(symbol: str, sec_type: str = "STK", exchange: str = "SMART", c
         Raises:
             ValueError: An argument was invalid or not supported.
     """
-    if not is_valid_nyse_ticker(symbol):
+    if not is_valid_ticker(symbol):
         logger.warning(f"Caught an invalid ticker {symbol} while trying to build a contract")
         raise ValueError(f"Invalid ticker {symbol}")
     if sec_type not in ["STK", "OPT", "FUT", "CASH", "CFD"]:
@@ -195,16 +236,14 @@ def make_order(action: str, order_type: str, limit_price: float | None, quantity
     if quantity < 0:
         logger.warning(f"Caught an invalid quantity {quantity} while trying to build an order")
         raise ValueError(f"Invalid quantity {quantity}")
-
-    requires_limit_price = order_type in ["LMT", "STP LMT", "LIT"]        
     
     o = Order()
-    o.action = action # "BUY" or "SELL"
+    o.action = action
     o.orderType = order_type
     o.totalQuantity = quantity
     o.eTradeOnly = False # avoid deprecated-field errors on recent API versions
     o.firmQuoteOnly = False
-    if requires_limit_price:
+    if order_type in ["LMT", "STP LMT", "LIT"]: # if a limit price is required
         if limit_price is None:
             logger.warning(f"Order type {order_type} requires a limit price but none was given")
             raise ValueError(f"Order type {order_type} requires a limit price")
@@ -291,10 +330,10 @@ def dispatch_acorn(event: str) -> None:
         Args:
             event: event ACORN is responding to (open, noon, eod)
     """
-    portfolio_data = _get_portfolio_json()
+    portfolio_data = _get_account_portfolio_json()
 
     if event in ("open", "noon"):
-        trade_dec(portfolio_data)
+        get_trade_dec(portfolio_data)
     elif event == "eod":
         eod_analysis(portfolio_data)
     else:

@@ -38,7 +38,7 @@ def call_trading_model(content: str) -> TradingDecision:
             response: trading decision object
     """
     try:
-        with open("./prompts/Trading.txt", "r", encoding="utf-8") as f:
+        with open("./prompts/TRADE.txt", "r", encoding="utf-8") as f:
             sysPrompt = f.read()
 
         response = client.responses.parse(
@@ -66,7 +66,7 @@ def call_analysis_model(content: str) -> str:
             response: trading decision object
     """
     try:
-        with open("./prompts/Aftermath.txt", "r", encoding="utf-8") as f:
+        with open("./prompts/ANALYSIS.txt", "r", encoding="utf-8") as f:
             sysPrompt = f.read()
 
         response = client.responses.create(

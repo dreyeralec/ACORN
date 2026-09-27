@@ -34,12 +34,10 @@ def connect_ib_gateway(host="127.0.0.1", port=4002, client_id=1, timeout=10) -> 
     """
     global _app
 
-    # Fast path: already connected, no lock needed for the common case
     if _app is not None and _app.isConnected():
         return _app
 
     with _lock:
-        # Re-check inside the lock in case another thread just connected
         if _app is not None and _app.isConnected():
             return _app
 

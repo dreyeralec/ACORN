@@ -15,11 +15,12 @@ class IBApp(EWrapper, EClient):
         EClient.__init__(self, self)
         self.next_order_id = None
         self.connected_event = threading.Event()
+        self.request_positions_event = threading.Event()
+        self.account_summary_event = threading.Event()
         self.data_queue = queue.Queue(0)   # hand data off to your main thread
         self.positions = pd.DataFrame([], columns = ['Account', 'Symbol', 'Quantity', 'Average Cost'])
         self.account_values = {}
         self.open_orders = {}
-        self.net_liquid = None
         self.lock = threading.Lock()
 
     # ---- Connection lifecycle ----
@@ -64,12 +65,16 @@ class IBApp(EWrapper, EClient):
             self.positions.loc[index] = account, contract.symbol, position, avgCost
 
     def positionEnd(self):
-        return super().positionEnd()
+        return self.request_positions_event.set()
 
     def updateAccountValue(self, key: str, val: str, currency: str, accountName: str):
-        if key == "NetLiquidation":
-            self.net_liquid = val
-        return super().updateAccountValue(key, val, currency, accountName)
+        self.account_values[key] = float(val)
+
+    def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str):
+        self.account_values[tag] = value
+
+    def accountSummaryEnd(self, reqId):
+        return self.account_summary_event.set()
 
     # ---- Market data ----
     def tickPrice(self, reqId, tickType, price, attrib):

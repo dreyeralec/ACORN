@@ -4,11 +4,7 @@ import logging
 
 from requests import RequestException
 
-from dotenv import load_dotenv
-
 logger = logging.getLogger(__name__)
-
-load_dotenv()
 
 TOKEN = os.environ["TELEGRAM_BOT_KEY"]
 

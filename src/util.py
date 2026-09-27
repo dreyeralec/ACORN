@@ -1,31 +1,49 @@
-def is_valid_nyse_ticker(symbol: str) -> bool:
-    """Check if a ticker is valid on the NYSE or NYQ
+import pandas as pd
+
+NASDAQ_TICKERS_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
+OTHER_TICKERS_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
+
+
+def load_us_tickers() -> set[str]:
+    """Load all major US market tickers from nasdaqtrader.com.
+    
+        Returns:
+            Set of all valid tickers.
+    """
+    nasdaq = pd.read_csv(NASDAQ_TICKERS_URL, sep="|")
+    other = pd.read_csv(OTHER_TICKERS_URL, sep="|")
+    nasTickers = nasdaq.iloc[:,[0]]
+    otherTickers = other.iloc[:,[0]]
+    nasTickers.columns = otherTickers.columns
+
+    allTickers = pd.concat([nasTickers, otherTickers], ignore_index=True)
+
+    return set(allTickers["ACT Symbol"])
+
+
+US_MARKET_TICKERS = load_us_tickers()
+
+
+def is_valid_ticker(symbol: str) -> bool:
+    """Check if a ticker is valid on major US Markets.
 
         Args:
-            symbol: Ticker to be validated
+            symbol: Ticker to be validated.
 
         Returns:
-            If ticker was validated
+            If ticker was validated.
     """
-    import yfinance as yf
-
-    ticker = yf.Ticker(symbol)
-    info = ticker.info
-    exchange = info.get("exchange", "")
-    shortName = info.get("shortName")
-    if shortName and exchange in ["NYQ", "NYSE"]:
-        return True
-    return False
+    return symbol.upper() in US_MARKET_TICKERS
 
 
 def time_to_next_position_update() -> tuple[float, str]:
 
     """Gets amount of time for ACORN to sleep until the next position update window
-        currently using market open, noon, and eod
+        currently using market open, noon, and eod.
 
         Returns:
             Tuple containing seconds till the next event and the name of the event
-            'open', 'noon', or 'eod'
+            'open', 'noon', or 'eod'.
     """
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
