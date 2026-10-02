@@ -1,4 +1,4 @@
-from src.telegram.telegram import _post, tel_notify, tel_send_trade, tel_get_updates
+from telegram.telegram import _post, tel_notify, tel_send_trade, tel_get_updates
 
 
 

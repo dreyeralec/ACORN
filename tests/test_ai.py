@@ -1,8 +1,8 @@
 import pytest
 
-from src.ai.ai import call_trading_model, call_analysis_model
-from src.acorn.acorn import _get_account_portfolio_json
-from src.acorn.util import is_valid_ticker
+from ai.model import call_trading_model, call_analysis_model
+from acorn.engine import _get_account_portfolio_json
+from acorn.util import is_valid_ticker
 
 
 def test_call_trading_model():

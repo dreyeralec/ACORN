@@ -7,10 +7,10 @@ from ibapi.order import Order
 
 from pandas import DataFrame
 
-from src.ai.ai import call_trading_model, call_analysis_model, AIServiceError
-from src.acorn.util import is_valid_ticker
-from src.telegram.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
-from src.ib.gateway import connect_ib_gateway
+from ai.model import call_trading_model, call_analysis_model, AIServiceError
+from .util import is_valid_ticker
+from telegram.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
+from ib.gateway import connect_ib_gateway
 
 logger = logging.getLogger(__name__)
 

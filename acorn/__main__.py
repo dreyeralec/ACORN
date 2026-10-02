@@ -1,9 +1,9 @@
 import logging
 import time
 
-from src.acorn.util import time_to_next_position_update
-from src.acorn.acorn import dispatch_acorn
-from src.ib.gateway import connect_ib_gateway
+from acorn.util import time_to_next_position_update
+from acorn.engine import dispatch_acorn
+from ib.gateway import connect_ib_gateway
 
 
 logging.basicConfig(

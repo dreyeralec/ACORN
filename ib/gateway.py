@@ -1,7 +1,7 @@
 import logging
 import threading
 
-from src.ib.ib import IBApp
+from ib.ib import IBApp
 
 logger = logging.getLogger(__name__)
 
