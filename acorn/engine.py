@@ -9,7 +9,7 @@ from pandas import DataFrame
 
 from ai.model import call_trading_model, call_analysis_model, AIServiceError
 from .util import is_valid_ticker
-from telegram.telegram import tel_notify, tel_send_trade, tel_get_updates, TelegramServiceError
+from telegram.telegram import telegram_client, TelegramServiceError
 from ib.gateway import connect_ib_gateway
 
 logger = logging.getLogger(__name__)
@@ -70,9 +70,9 @@ def _get_account_portfolio_json() -> str:
         Returns:
             Combined account and portfolio data as a string.
     """
-    portf = _get_portfolio_data_json()
-    acc = _get_account_data_json()
-    return json.dumps(acc + portf)
+    portfolio = _get_portfolio_data_json()
+    account = _get_account_data_json()
+    return json.dumps(account + portfolio)
 
 
 def wait_res(wait: int) -> str | None:
@@ -84,19 +84,11 @@ def wait_res(wait: int) -> str | None:
         Returns:
             User's response as a string, or None if timed out. 
     """
-    offset = None
-    secs = wait * 60
-    while secs > 0:
-        time.sleep(1)
-        secs -= 1
-        data = tel_get_updates(offset)
-        for update in data["result"]:
-            offset = update["update_id"] + 1
-            message = update["message"]
-            if "message" not in update:
-                continue
-
-            return message["text"]
+    timeout = time.time() + wait * 60
+    while time.time() < timeout:
+        message = telegram_client.tel_get_message()
+        if message is not None: 
+            return message
     return None
 
 # todo: make this more flexible
@@ -133,7 +125,7 @@ def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, 
             The user's decision on the trade recommendation.
     """
     try:
-        tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
+        telegram_client.tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
         userRes = wait_res(10)
         return eval_user_res(userRes)
     except TelegramServiceError as e:
@@ -148,16 +140,16 @@ def get_trade_dec(portfolio_data: str) -> None:
             portfolio_data: String of portfolio positions.
     """
     try:
-        tradingDecision = call_trading_model(portfolio_data)
+        trading_decision = call_trading_model(portfolio_data)
     except AIServiceError as e:
         logger.warning(f"Trading model returned no decision:\n{e}")
         return
     
-    totalActs = len(tradingDecision.actions)
-    for act, a in enumerate(tradingDecision.actions, start=1):
+    totalActs = len(trading_decision.actions)
+    for act, a in enumerate(trading_decision.actions, start=1):
         if a.action == "HOLD":
             logger.info(f"Holding {a.symbol}")
-            tel_notify(f"ACORN chose to hold {a.symbol}\n\n{act} of {totalActs}")
+            telegram_client.tel_notify(f"ACORN chose to hold {a.symbol}\n\n{act} of {totalActs}")
         else:
             stage_action(a.symbol, a.action, a.quantity, a.order_type, a.limit_price, a.reasoning, act, totalActs)
 
@@ -173,7 +165,7 @@ def eod_analysis(portfolio_data: str) -> None:
     except AIServiceError as e:
         logger.warning(f"Analysis model returned no response:\n{e}")
         return
-    tel_notify(res)
+    telegram_client.tel_notify(res)
 
 
 def make_contract(symbol: str, sec_type: str = "STK", exchange: str = "SMART", currency: str = "USD") -> Contract:
@@ -272,7 +264,7 @@ def stage_action(symbol: str, action: str, quantity: int, order_type: str, limit
         place_trade(symbol, action, quantity, order_type, limit_price)
     else:
         logger.info(f"Discarded {action} order on {symbol}")
-        tel_notify(f"Discarded {action} order on {symbol}")
+        telegram_client.tel_notify(f"Discarded {action} order on {symbol}")
 
 
 def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_price: float | None) -> None:
@@ -294,13 +286,13 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
         order = make_order(action, order_type, limit_price, quantity)
         submit_order(contract, order)
         logger.info(f"Performed {action} on {symbol}")
-        tel_notify(f"{action} {symbol} succeeded")
+        telegram_client.tel_notify(f"{action} {symbol} succeeded")
     except ValueError as e:
         logger.error(f"ACORN rejected an order:\n\n{e}")
-        tel_notify(f"ACORN rejected an order:\n\n{e}")
+        telegram_client.tel_notify(f"ACORN rejected an order:\n\n{e}")
     except RuntimeError as e:
         logger.error(f"ACORN hit a runtime error:\n\n{e}")
-        tel_notify(f"ACORN hit a runtime error:\n\n{e}")
+        telegram_client.tel_notify(f"ACORN hit a runtime error:\n\n{e}")
 
 
 def submit_order(contract: Contract, order: Order) -> None:
