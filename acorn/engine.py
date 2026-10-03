@@ -75,7 +75,7 @@ def _get_account_portfolio_json() -> str:
     return json.dumps(account + portfolio)
 
 
-def wait_res(wait: int) -> str | None:
+def wait_res() -> str | None:
     """Wait for response from telegram for specified amount of minutes.
 
         Args:
@@ -84,11 +84,10 @@ def wait_res(wait: int) -> str | None:
         Returns:
             User's response as a string, or None if timed out. 
     """
-    timeout = time.time() + wait * 60
-    while time.time() < timeout:
-        message = telegram_client.tel_get_message()
-        if message is not None: 
-            return message
+    message = telegram_client.tel_get_response()
+    if message is not None: 
+        return message
+    telegram_client.tel_notify("No response received, aborting action")
     return None
 
 # todo: make this more flexible
@@ -126,7 +125,7 @@ def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, 
     """
     try:
         telegram_client.tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
-        userRes = wait_res(10)
+        userRes = wait_res()
         return eval_user_res(userRes)
     except TelegramServiceError as e:
         logger.error(f"Couldn't reach Telegram, decision defaulting to NO")
@@ -288,11 +287,11 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
         logger.info(f"Performed {action} on {symbol}")
         telegram_client.tel_notify(f"{action} {symbol} succeeded")
     except ValueError as e:
-        logger.error(f"ACORN rejected an order:\n\n{e}")
-        telegram_client.tel_notify(f"ACORN rejected an order:\n\n{e}")
+        logger.error(f"ACORN rejected an order: {e}")
+        telegram_client.tel_notify(f"ACORN rejected an order: {e}")
     except RuntimeError as e:
-        logger.error(f"ACORN hit a runtime error:\n\n{e}")
-        telegram_client.tel_notify(f"ACORN hit a runtime error:\n\n{e}")
+        logger.error(f"ACORN hit a runtime error: {e}")
+        telegram_client.tel_notify(f"ACORN hit a runtime error: {e}")
 
 
 def submit_order(contract: Contract, order: Order) -> None:

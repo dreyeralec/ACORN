@@ -55,7 +55,7 @@ Response structure:
             Choose the most appropriate supported execution method from MKT, LMT, STP, STP LMT, MIT, LIT, MOC, LOC, or MTL
 
         - limit_price:
-            Provide a price only when required or appropriate for the chosen order type. Otherwise return null.
+            LMT, STP LMT, LIT order_type's must have a limit_price, use a value based on the current share price and desired buy/sell target
 
         - reasoning:
             Explain reasoning behind the decision for the action. 1-2 sentence max
